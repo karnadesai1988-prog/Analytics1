@@ -7,8 +7,8 @@ import { cn } from '../lib/utils';
 import { MapPin, LayoutDashboard, FileText, MessageSquare, LogOut, Wifi, WifiOff, Settings } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard & Analytics', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Territories & Map', href: '/territories', icon: MapPin },
+  { name: 'Dashboard & Analytics', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Data Gathering', href: '/data-gathering', icon: FileText },
   { name: 'Comments', href: '/comments', icon: MessageSquare },
   { name: 'Settings', href: '/settings', icon: Settings },
