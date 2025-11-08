@@ -479,7 +479,9 @@ async def create_pin(pin: PinCreate, user: User = Depends(check_role([UserRole.A
         except:
             pin_doc['aiInsights'] = None
     await db.pins.insert_one(pin_doc)
-    await manager.broadcast(json.dumps({"type": "pin_created", "data": pin_doc}))
+    # Remove MongoDB ObjectId before broadcasting
+    broadcast_data = {k: v for k, v in pin_doc.items() if k != '_id'}
+    await manager.broadcast(json.dumps({"type": "pin_created", "data": broadcast_data}))
     return Pin(**pin_doc)
 
 @api_router.get("/pins", response_model=List[Pin])
