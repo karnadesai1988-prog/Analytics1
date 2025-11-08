@@ -522,16 +522,59 @@ export const TerritoriesUnified = () => {
                     position={[pin.location.lat, pin.location.lng]}
                     icon={icon}
                   >
-                    <Popup>
-                      <div className="text-sm">
-                        <strong>{pin.label}</strong><br/>
-                        Types: {pin.type.join(', ')}<br/>
-                        {pin.description && <><br/>{pin.description}</>}
-                        <br/>
-                        <span className="text-xs text-gray-500">By: {pin.userName}</span>
+                    <Popup maxWidth={280}>
+                      <div className="text-sm space-y-2">
+                        <div className="border-b pb-2">
+                          <h3 className="font-bold text-base">{pin.label}</h3>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {pin.type.map((type, idx) => (
+                              <span key={idx} className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                {type}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {pin.description && (
+                          <div>
+                            <p className="text-xs text-gray-700">{pin.description}</p>
+                          </div>
+                        )}
+
+                        {pin.address && (
+                          <div>
+                            <span className="text-xs text-gray-600">Address: </span>
+                            <span className="text-xs font-medium">{pin.address}</span>
+                          </div>
+                        )}
+
+                        <div className="text-xs">
+                          <span className="text-gray-600">Location: </span>
+                          <span className="font-mono">{pin.location.lat.toFixed(4)}, {pin.location.lng.toFixed(4)}</span>
+                        </div>
+
+                        {pin.hasGeofence && (
+                          <div className="text-xs bg-purple-50 text-purple-800 px-2 py-1 rounded">
+                            🔵 Geofence: {pin.geofenceRadius}m radius
+                          </div>
+                        )}
+
                         {isHighlighted && (
-                          <div className="mt-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-                            Inside selected territory
+                          <div className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded font-semibold">
+                            📍 Inside selected territory
+                          </div>
+                        )}
+
+                        <div className="pt-2 border-t text-xs text-gray-500">
+                          Created by: <span className="font-medium">{pin.userName}</span>
+                        </div>
+
+                        {pin.aiInsights && (
+                          <div className="pt-2 border-t">
+                            <h4 className="text-xs font-semibold text-purple-600 mb-1">AI Insights</h4>
+                            <div className="text-xs bg-purple-50 p-2 rounded">
+                              {JSON.stringify(pin.aiInsights.insights || pin.aiInsights)}
+                            </div>
                           </div>
                         )}
                       </div>
