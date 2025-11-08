@@ -42,6 +42,7 @@ const AppContent = () => {
         <Routes>
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/territories" element={<PrivateRoute><TerritoriesNew /></PrivateRoute>} />
+          <Route path="/map-management" element={<PrivateRoute><MapManagement /></PrivateRoute>} />
           <Route path="/data-gathering" element={<PrivateRoute><DataGathering /></PrivateRoute>} />
           <Route path="/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
           <Route path="/comments" element={<PrivateRoute><Comments /></PrivateRoute>} />
