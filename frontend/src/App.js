@@ -44,6 +44,7 @@ const AppContent = () => {
           <Route path="/data-gathering" element={<PrivateRoute><DataGathering /></PrivateRoute>} />
           <Route path="/analytics" element={<PrivateRoute><Analytics /></PrivateRoute>} />
           <Route path="/comments" element={<PrivateRoute><Comments /></PrivateRoute>} />
+          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
