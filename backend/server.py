@@ -33,7 +33,7 @@ openai_client = None
 if os.environ.get('OPENAI_API_KEY'):
     openai_client = AsyncOpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
 
-app = FastAPI(title="R Territory AI Engine")
+app = FastAPI(title="R Territory AI Engine - Ahmedabad")
 api_router = APIRouter(prefix="/api")
 
 class ConnectionManager:
@@ -103,6 +103,7 @@ class AIInsights(BaseModel):
     appreciationPercent: float = 0
     demandPressure: float = 0
     confidenceScore: float = 0
+    aiSuggestions: List[str] = []
 
 class Territory(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -111,7 +112,7 @@ class Territory(BaseModel):
     city: str
     zone: str
     center: Dict[str, float]
-    radius: float = 5000  # 5km default
+    radius: float = 5000
     metrics: TerritoryMetrics
     restrictions: TerritoryRestrictions
     aiInsights: AIInsights
@@ -136,18 +137,20 @@ class TerritoryUpdate(BaseModel):
     metrics: Optional[TerritoryMetrics] = None
     restrictions: Optional[TerritoryRestrictions] = None
 
-# Pin Models
 class Pin(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     location: Dict[str, float]
-    type: List[str]  # ["job", "supplier", "vendor", "shop"]
+    type: List[str]
     label: str
     description: Optional[str] = None
     address: Optional[str] = None
+    hasGeofence: bool = False
+    geofenceRadius: float = 1000
     territoryId: Optional[str] = None
     projectId: Optional[str] = None
     eventId: Optional[str] = None
+    aiInsights: Optional[Dict[str, Any]] = None
     createdBy: str
     userName: str
     createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -158,9 +161,12 @@ class PinCreate(BaseModel):
     label: str
     description: Optional[str] = None
     address: Optional[str] = None
+    hasGeofence: bool = False
+    geofenceRadius: float = 1000
     territoryId: Optional[str] = None
     projectId: Optional[str] = None
     eventId: Optional[str] = None
+    generateAIInsights: bool = False
 
 class PinUpdate(BaseModel):
     location: Optional[Dict[str, float]] = None
@@ -168,11 +174,12 @@ class PinUpdate(BaseModel):
     label: Optional[str] = None
     description: Optional[str] = None
     address: Optional[str] = None
+    hasGeofence: Optional[bool] = None
+    geofenceRadius: Optional[float] = None
     territoryId: Optional[str] = None
     projectId: Optional[str] = None
     eventId: Optional[str] = None
 
-# Project Models
 class Project(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -180,9 +187,11 @@ class Project(BaseModel):
     description: str
     location: Dict[str, float]
     territoryId: Optional[str] = None
-    status: str = "active"  # active, completed, paused
+    status: str = "active"
+    budget: Optional[float] = None
     startDate: Optional[datetime] = None
     endDate: Optional[datetime] = None
+    aiRecommendations: List[str] = []
     createdBy: str
     createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -192,10 +201,11 @@ class ProjectCreate(BaseModel):
     location: Dict[str, float]
     territoryId: Optional[str] = None
     status: str = "active"
+    budget: Optional[float] = None
     startDate: Optional[datetime] = None
     endDate: Optional[datetime] = None
+    generateAIRecommendations: bool = False
 
-# Event Models
 class Event(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -205,7 +215,9 @@ class Event(BaseModel):
     territoryId: Optional[str] = None
     projectId: Optional[str] = None
     eventDate: datetime
-    category: str  # "social", "infrastructure", "community"
+    category: str
+    attendeesEstimate: Optional[int] = None
+    aiPredictions: Optional[Dict[str, Any]] = None
     createdBy: str
     userName: str
     createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -218,6 +230,8 @@ class EventCreate(BaseModel):
     projectId: Optional[str] = None
     eventDate: datetime
     category: str
+    attendeesEstimate: Optional[int] = None
+    generateAIPredictions: bool = False
 
 class CommentCreate(BaseModel):
     territoryId: str
@@ -234,6 +248,7 @@ class Comment(BaseModel):
     text: str
     validationStatus: str
     validationReason: Optional[str] = None
+    sentiment: Optional[str] = None
     createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class DataGatheringForm(BaseModel):
@@ -270,6 +285,11 @@ class MetricsHistory(BaseModel):
 
 class APIKeyConfig(BaseModel):
     openai_api_key: Optional[str] = None
+
+class AIAnalysisRequest(BaseModel):
+    entityType: str
+    entityId: str
+    analysisType: str
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -323,14 +343,57 @@ def predict_appreciation(metrics: TerritoryMetrics) -> AIInsights:
         
         confidence = min(0.70 + (metrics.qualityOfProject / 50) + (metrics.govtInfra / 50), 0.95)
         
+        suggestions = []
+        if metrics.livabilityIndex < 6:
+            suggestions.append("Improve livability index through better amenities")
+        if metrics.roads < 7:
+            suggestions.append("Road infrastructure needs enhancement")
+        if metrics.crimeRate > 5:
+            suggestions.append("Focus on safety and security measures")
+        if metrics.airPollutionIndex > 6:
+            suggestions.append("Implement pollution control initiatives")
+        
         return AIInsights(
             appreciationPercent=round(max(0, min(appreciation, 25)), 2),
             demandPressure=round(max(0, demand_pressure), 2),
-            confidenceScore=round(confidence, 2)
+            confidenceScore=round(confidence, 2),
+            aiSuggestions=suggestions
         )
     except Exception as e:
         logging.error(f"Error in predict_appreciation: {e}")
-        return AIInsights(appreciationPercent=0, demandPressure=0, confidenceScore=0.5)
+        return AIInsights(appreciationPercent=0, demandPressure=0, confidenceScore=0.5, aiSuggestions=[])
+
+async def generate_pin_ai_insights(pin_data: dict, api_key: str = None) -> Dict:
+    try:
+        key = api_key or os.environ.get('OPENAI_API_KEY')
+        if not key:
+            return {"analysis": "AI insights unavailable", "recommendations": []}
+        
+        client = AsyncOpenAI(api_key=key)
+        
+        prompt = f"""Analyze this location pin data and provide business insights:
+        Type: {', '.join(pin_data.get('type', []))}
+        Label: {pin_data.get('label', '')}
+        Description: {pin_data.get('description', 'N/A')}
+        
+        Provide:
+        1. Strategic importance (1-2 sentences)
+        2. 3 actionable recommendations
+        3. Risk assessment
+        
+        Format as JSON with keys: importance, recommendations (array), risks"""
+        
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300
+        )
+        
+        import json
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        logging.error(f"AI insights error: {e}")
+        return {"analysis": "Error generating insights", "recommendations": []}
 
 def validate_comment_regex(text: str) -> Dict:
     banned_patterns = [
@@ -340,9 +403,9 @@ def validate_comment_regex(text: str) -> Dict:
     
     for pattern in banned_patterns:
         if re.search(pattern, text, re.IGNORECASE):
-            return {"label": "flagged", "reason": f"Matched banned pattern: {pattern}"}
+            return {"label": "flagged", "reason": f"Matched banned pattern: {pattern}", "sentiment": "negative"}
     
-    return {"label": "valid", "reason": "No violations detected"}
+    return {"label": "valid", "reason": "No violations detected", "sentiment": "neutral"}
 
 async def validate_comment_ai(text: str, api_key: str) -> Dict:
     try:
@@ -351,22 +414,22 @@ async def validate_comment_ai(text: str, api_key: str) -> Dict:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a content moderator. Analyze comments and determine if they contain spam, abuse, offensive language, or inappropriate content. Respond with only 'VALID' or 'FLAGGED: reason'."},
-                {"role": "user", "content": f"Analyze this comment: {text}"}
+                {"role": "system", "content": "Analyze comment for spam/abuse and provide sentiment. Respond with JSON: {status: 'VALID' or 'FLAGGED', reason: string, sentiment: 'positive'/'neutral'/'negative'}"},
+                {"role": "user", "content": text}
             ],
             max_tokens=100
         )
         
-        result = response.choices[0].message.content
+        result = json.loads(response.choices[0].message.content)
         
-        if "FLAGGED" in result:
-            reason = result.replace("FLAGGED:", "").strip()
-            return {"label": "flagged", "reason": reason}
-        else:
-            return {"label": "valid", "reason": "AI validation passed"}
+        return {
+            "label": "flagged" if result.get("status") == "FLAGGED" else "valid",
+            "reason": result.get("reason", "AI validation completed"),
+            "sentiment": result.get("sentiment", "neutral")
+        }
     except Exception as e:
         logging.error(f"AI validation error: {e}")
-        return {"label": "valid", "reason": f"AI validation unavailable: {str(e)}"}
+        return {"label": "valid", "reason": "AI validation unavailable", "sentiment": "neutral"}
 
 # ==================== AUTH ROUTES ====================
 
@@ -376,16 +439,10 @@ async def register(user_data: UserRegister):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    user = User(
-        email=user_data.email,
-        name=user_data.name,
-        role=user_data.role
-    )
-    
+    user = User(email=user_data.email, name=user_data.name, role=user_data.role)
     doc = user.model_dump()
     doc['password_hash'] = hash_password(user_data.password)
     doc['created_at'] = doc['created_at'].isoformat()
-    
     await db.users.insert_one(doc)
     return user
 
@@ -415,97 +472,60 @@ async def get_me(current_user: Dict = Depends(get_current_user)):
     return User(**user)
 
 @api_router.post("/auth/config-api-key")
-async def configure_api_key(
-    config: APIKeyConfig,
-    current_user: Dict = Depends(get_current_user)
-):
-    await db.users.update_one(
-        {"id": current_user['user_id']},
-        {"$set": {"openai_api_key": config.openai_api_key}}
-    )
+async def configure_api_key(config: APIKeyConfig, current_user: Dict = Depends(get_current_user)):
+    await db.users.update_one({"id": current_user['user_id']}, {"$set": {"openai_api_key": config.openai_api_key}})
     return {"message": "API key configured successfully"}
 
 # ==================== TERRITORY ROUTES ====================
 
 @api_router.post("/territories", response_model=Territory)
-async def create_territory(
-    territory_data: TerritoryCreate,
-    current_user: Dict = Depends(get_current_user)
-):
+async def create_territory(territory_data: TerritoryCreate, current_user: Dict = Depends(get_current_user)):
     ai_insights = predict_appreciation(territory_data.metrics)
-    
     territory = Territory(
-        name=territory_data.name,
-        city=territory_data.city,
-        zone=territory_data.zone,
-        center=territory_data.center,
-        radius=territory_data.radius,
-        metrics=territory_data.metrics,
-        restrictions=territory_data.restrictions,
-        aiInsights=ai_insights,
-        createdBy=current_user['user_id']
+        name=territory_data.name, city=territory_data.city, zone=territory_data.zone,
+        center=territory_data.center, radius=territory_data.radius,
+        metrics=territory_data.metrics, restrictions=territory_data.restrictions,
+        aiInsights=ai_insights, createdBy=current_user['user_id']
     )
-    
     doc = territory.model_dump()
     doc['updatedAt'] = doc['updatedAt'].isoformat()
-    
     await db.territories.insert_one(doc)
     
-    history = MetricsHistory(
-        territoryId=territory.id,
-        metrics=territory.metrics,
-        aiInsights=ai_insights
-    )
+    history = MetricsHistory(territoryId=territory.id, metrics=territory.metrics, aiInsights=ai_insights)
     history_doc = history.model_dump()
     history_doc['timestamp'] = history_doc['timestamp'].isoformat()
     await db.metrics_history.insert_one(history_doc)
     
     broadcast_data = {k: v for k, v in doc.items() if k != '_id'}
     await manager.broadcast(json.dumps({"type": "territory_created", "data": broadcast_data}))
-    
     return territory
 
 @api_router.get("/territories", response_model=List[Territory])
 async def get_territories(current_user: Dict = Depends(get_current_user)):
     territories = await db.territories.find({}, {"_id": 0}).to_list(1000)
-    
     for territory in territories:
         if isinstance(territory.get('updatedAt'), str):
             territory['updatedAt'] = datetime.fromisoformat(territory['updatedAt'])
-        
         if 'coordinates' in territory and 'center' not in territory:
             coords = territory.get('coordinates', {}).get('coordinates', [[]])[0]
             if coords and len(coords) > 0:
                 lats = [c[1] for c in coords]
                 lngs = [c[0] for c in coords]
-                territory['center'] = {
-                    'lat': sum(lats) / len(lats),
-                    'lng': sum(lngs) / len(lngs)
-                }
+                territory['center'] = {'lat': sum(lats) / len(lats), 'lng': sum(lngs) / len(lngs)}
                 territory['radius'] = 5000
-    
     return territories
 
 @api_router.get("/territories/{territory_id}", response_model=Territory)
-async def get_territory(
-    territory_id: str,
-    current_user: Dict = Depends(get_current_user)
-):
+async def get_territory(territory_id: str, current_user: Dict = Depends(get_current_user)):
     territory = await db.territories.find_one({"id": territory_id}, {"_id": 0})
     if not territory:
         raise HTTPException(status_code=404, detail="Territory not found")
-    
     if isinstance(territory.get('updatedAt'), str):
         territory['updatedAt'] = datetime.fromisoformat(territory['updatedAt'])
-    
     return Territory(**territory)
 
 @api_router.put("/territories/{territory_id}", response_model=Territory)
-async def update_territory(
-    territory_id: str,
-    territory_data: TerritoryUpdate,
-    current_user: Dict = Depends(get_current_user)
-):
+async def update_territory(territory_id: str, territory_data: TerritoryUpdate, current_user: Dict = Depends(get_current_user)):
     if current_user['role'] not in [UserRole.ADMIN, UserRole.MANAGER, UserRole.COMMUNITY_HEAD]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
@@ -514,25 +534,16 @@ async def update_territory(
         raise HTTPException(status_code=404, detail="Territory not found")
     
     update_data = territory_data.model_dump(exclude_none=True)
-    
     if 'metrics' in update_data:
         metrics = TerritoryMetrics(**update_data['metrics'])
         ai_insights = predict_appreciation(metrics)
         update_data['aiInsights'] = ai_insights.model_dump()
     
     update_data['updatedAt'] = datetime.now(timezone.utc).isoformat()
-    
-    await db.territories.update_one(
-        {"id": territory_id},
-        {"$set": update_data}
-    )
+    await db.territories.update_one({"id": territory_id}, {"$set": update_data})
     
     if 'metrics' in update_data:
-        history = MetricsHistory(
-            territoryId=territory_id,
-            metrics=metrics,
-            aiInsights=ai_insights
-        )
+        history = MetricsHistory(territoryId=territory_id, metrics=metrics, aiInsights=ai_insights)
         history_doc = history.model_dump()
         history_doc['timestamp'] = history_doc['timestamp'].isoformat()
         await db.metrics_history.insert_one(history_doc)
@@ -543,150 +554,117 @@ async def update_territory(
     
     if isinstance(updated.get('updatedAt'), str):
         updated['updatedAt'] = datetime.fromisoformat(updated['updatedAt'])
-    
     return Territory(**updated)
 
 @api_router.delete("/territories/{territory_id}")
-async def delete_territory(
-    territory_id: str,
-    current_user: Dict = Depends(get_current_user)
-):
+async def delete_territory(territory_id: str, current_user: Dict = Depends(get_current_user)):
     if current_user['role'] != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Only admins can delete territories")
-    
     result = await db.territories.delete_one({"id": territory_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Territory not found")
-    
     await manager.broadcast(json.dumps({"type": "territory_deleted", "territoryId": territory_id}))
-    
     return {"message": "Territory deleted successfully"}
 
 # ==================== PIN ROUTES ====================
 
 @api_router.post("/pins", response_model=Pin)
-async def create_pin(
-    pin_data: PinCreate,
-    current_user: Dict = Depends(get_current_user)
-):
+async def create_pin(pin_data: PinCreate, current_user: Dict = Depends(get_current_user)):
     user = await db.users.find_one({"id": current_user['user_id']})
     
+    ai_insights = None
+    if pin_data.generateAIInsights:
+        api_key = user.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
+        if api_key:
+            ai_insights = await generate_pin_ai_insights(pin_data.model_dump(), api_key)
+    
     pin = Pin(
-        location=pin_data.location,
-        type=pin_data.type,
-        label=pin_data.label,
-        description=pin_data.description,
-        address=pin_data.address,
-        territoryId=pin_data.territoryId,
-        projectId=pin_data.projectId,
-        eventId=pin_data.eventId,
-        createdBy=current_user['user_id'],
-        userName=user['name']
+        location=pin_data.location, type=pin_data.type, label=pin_data.label,
+        description=pin_data.description, address=pin_data.address,
+        hasGeofence=pin_data.hasGeofence, geofenceRadius=pin_data.geofenceRadius,
+        territoryId=pin_data.territoryId, projectId=pin_data.projectId, eventId=pin_data.eventId,
+        aiInsights=ai_insights, createdBy=current_user['user_id'], userName=user['name']
     )
     
     doc = pin.model_dump()
     doc['createdAt'] = doc['createdAt'].isoformat()
-    
     await db.pins.insert_one(doc)
-    
-    await manager.broadcast(json.dumps({"type": "pin_created", "data": doc}))
-    
+    await manager.broadcast(json.dumps({"type": "pin_created", "data": {"id": pin.id, "label": pin.label}}))
     return pin
 
 @api_router.get("/pins", response_model=List[Pin])
-async def get_pins(
-    current_user: Dict = Depends(get_current_user),
-    territory_id: Optional[str] = Query(None)
-):
+async def get_pins(current_user: Dict = Depends(get_current_user), territory_id: Optional[str] = Query(None)):
     query = {}
     if territory_id:
         query['territoryId'] = territory_id
-    
     pins = await db.pins.find(query, {"_id": 0}).to_list(1000)
-    
     for pin in pins:
         if isinstance(pin.get('createdAt'), str):
             pin['createdAt'] = datetime.fromisoformat(pin['createdAt'])
-    
     return pins
 
 @api_router.get("/pins/{pin_id}", response_model=Pin)
-async def get_pin(
-    pin_id: str,
-    current_user: Dict = Depends(get_current_user)
-):
+async def get_pin(pin_id: str, current_user: Dict = Depends(get_current_user)):
     pin = await db.pins.find_one({"id": pin_id}, {"_id": 0})
     if not pin:
         raise HTTPException(status_code=404, detail="Pin not found")
-    
     if isinstance(pin.get('createdAt'), str):
         pin['createdAt'] = datetime.fromisoformat(pin['createdAt'])
-    
     return Pin(**pin)
 
 @api_router.put("/pins/{pin_id}", response_model=Pin)
-async def update_pin(
-    pin_id: str,
-    pin_data: PinUpdate,
-    current_user: Dict = Depends(get_current_user)
-):
+async def update_pin(pin_id: str, pin_data: PinUpdate, current_user: Dict = Depends(get_current_user)):
     existing = await db.pins.find_one({"id": pin_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Pin not found")
-    
     if existing['createdBy'] != current_user['user_id'] and current_user['role'] not in [UserRole.ADMIN, UserRole.MANAGER]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
     update_data = pin_data.model_dump(exclude_none=True)
-    
-    await db.pins.update_one(
-        {"id": pin_id},
-        {"$set": update_data}
-    )
-    
+    await db.pins.update_one({"id": pin_id}, {"$set": update_data})
     updated = await db.pins.find_one({"id": pin_id}, {"_id": 0})
-    
     if isinstance(updated.get('createdAt'), str):
         updated['createdAt'] = datetime.fromisoformat(updated['createdAt'])
-    
-    await manager.broadcast(json.dumps({"type": "pin_updated", "data": updated}))
-    
+    await manager.broadcast(json.dumps({"type": "pin_updated", "data": {"id": pin_id}}))
     return Pin(**updated)
 
 @api_router.delete("/pins/{pin_id}")
-async def delete_pin(
-    pin_id: str,
-    current_user: Dict = Depends(get_current_user)
-):
+async def delete_pin(pin_id: str, current_user: Dict = Depends(get_current_user)):
     existing = await db.pins.find_one({"id": pin_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Pin not found")
-    
     if existing['createdBy'] != current_user['user_id'] and current_user['role'] != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    
     await db.pins.delete_one({"id": pin_id})
-    
     await manager.broadcast(json.dumps({"type": "pin_deleted", "pinId": pin_id}))
-    
     return {"message": "Pin deleted successfully"}
 
 # ==================== PROJECT ROUTES ====================
 
 @api_router.post("/projects", response_model=Project)
-async def create_project(
-    project_data: ProjectCreate,
-    current_user: Dict = Depends(get_current_user)
-):
+async def create_project(project_data: ProjectCreate, current_user: Dict = Depends(get_current_user)):
+    ai_recommendations = []
+    if project_data.generateAIRecommendations:
+        user = await db.users.find_one({"id": current_user['user_id']})
+        api_key = user.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
+        if api_key:
+            try:
+                client = AsyncOpenAI(api_key=api_key)
+                response = await client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": f"Generate 5 strategic recommendations for this project in Ahmedabad: {project_data.name}. {project_data.description}"}],
+                    max_tokens=200
+                )
+                content = response.choices[0].message.content
+                ai_recommendations = [line.strip() for line in content.split('\n') if line.strip() and not line.strip().startswith('#')]
+            except:
+                ai_recommendations = ["Focus on local market research", "Engage community stakeholders", "Plan for seasonal variations"]
+    
     project = Project(
-        name=project_data.name,
-        description=project_data.description,
-        location=project_data.location,
-        territoryId=project_data.territoryId,
-        status=project_data.status,
-        startDate=project_data.startDate,
-        endDate=project_data.endDate,
-        createdBy=current_user['user_id']
+        name=project_data.name, description=project_data.description, location=project_data.location,
+        territoryId=project_data.territoryId, status=project_data.status, budget=project_data.budget,
+        startDate=project_data.startDate, endDate=project_data.endDate,
+        aiRecommendations=ai_recommendations, createdBy=current_user['user_id']
     )
     
     doc = project.model_dump()
@@ -695,146 +673,143 @@ async def create_project(
         doc['startDate'] = doc['startDate'].isoformat()
     if doc.get('endDate'):
         doc['endDate'] = doc['endDate'].isoformat()
-    
     await db.projects.insert_one(doc)
-    
     await manager.broadcast(json.dumps({"type": "project_created", "data": {"id": project.id, "name": project.name}}))
-    
     return project
 
 @api_router.get("/projects", response_model=List[Project])
-async def get_projects(
-    current_user: Dict = Depends(get_current_user),
-    territory_id: Optional[str] = Query(None)
-):
+async def get_projects(current_user: Dict = Depends(get_current_user), territory_id: Optional[str] = Query(None)):
     query = {}
     if territory_id:
         query['territoryId'] = territory_id
-    
     projects = await db.projects.find(query, {"_id": 0}).to_list(1000)
-    
     for project in projects:
         if isinstance(project.get('createdAt'), str):
             project['createdAt'] = datetime.fromisoformat(project['createdAt'])
-        if isinstance(project.get('startDate'), str):
+        if project.get('startDate') and isinstance(project['startDate'], str):
             project['startDate'] = datetime.fromisoformat(project['startDate'])
-        if isinstance(project.get('endDate'), str):
+        if project.get('endDate') and isinstance(project['endDate'], str):
             project['endDate'] = datetime.fromisoformat(project['endDate'])
-    
     return projects
 
 # ==================== EVENT ROUTES ====================
 
 @api_router.post("/events", response_model=Event)
-async def create_event(
-    event_data: EventCreate,
-    current_user: Dict = Depends(get_current_user)
-):
+async def create_event(event_data: EventCreate, current_user: Dict = Depends(get_current_user)):
     user = await db.users.find_one({"id": current_user['user_id']})
     
+    ai_predictions = None
+    if event_data.generateAIPredictions:
+        api_key = user.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
+        if api_key:
+            try:
+                client = AsyncOpenAI(api_key=api_key)
+                response = await client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": f"Predict success factors for this event in Ahmedabad: {event_data.title}. Category: {event_data.category}. Provide JSON with turnout_estimate, success_probability, key_challenges"}],
+                    max_tokens=150
+                )
+                ai_predictions = json.loads(response.choices[0].message.content)
+            except:
+                ai_predictions = {"turnout_estimate": "Medium", "success_probability": 0.75, "key_challenges": ["Weather", "Accessibility"]}
+    
     event = Event(
-        title=event_data.title,
-        description=event_data.description,
-        location=event_data.location,
-        territoryId=event_data.territoryId,
-        projectId=event_data.projectId,
-        eventDate=event_data.eventDate,
-        category=event_data.category,
-        createdBy=current_user['user_id'],
-        userName=user['name']
+        title=event_data.title, description=event_data.description, location=event_data.location,
+        territoryId=event_data.territoryId, projectId=event_data.projectId,
+        eventDate=event_data.eventDate, category=event_data.category,
+        attendeesEstimate=event_data.attendeesEstimate, aiPredictions=ai_predictions,
+        createdBy=current_user['user_id'], userName=user['name']
     )
     
     doc = event.model_dump()
     doc['createdAt'] = doc['createdAt'].isoformat()
     doc['eventDate'] = doc['eventDate'].isoformat()
-    
     await db.events.insert_one(doc)
-    
     await manager.broadcast(json.dumps({"type": "event_created", "data": {"id": event.id, "title": event.title}}))
-    
     return event
 
 @api_router.get("/events", response_model=List[Event])
-async def get_events(
-    current_user: Dict = Depends(get_current_user),
-    territory_id: Optional[str] = Query(None),
-    project_id: Optional[str] = Query(None)
-):
+async def get_events(current_user: Dict = Depends(get_current_user), territory_id: Optional[str] = Query(None), project_id: Optional[str] = Query(None)):
     query = {}
     if territory_id:
         query['territoryId'] = territory_id
     if project_id:
         query['projectId'] = project_id
-    
     events = await db.events.find(query, {"_id": 0}).sort("eventDate", -1).to_list(1000)
-    
     for event in events:
         if isinstance(event.get('createdAt'), str):
             event['createdAt'] = datetime.fromisoformat(event['createdAt'])
         if isinstance(event.get('eventDate'), str):
             event['eventDate'] = datetime.fromisoformat(event['eventDate'])
-    
     return events
+
+# ==================== AI ANALYSIS ENDPOINT ====================
+
+@api_router.post("/ai/analyze")
+async def ai_analyze(request: AIAnalysisRequest, current_user: Dict = Depends(get_current_user)):
+    user = await db.users.find_one({"id": current_user['user_id']})
+    api_key = user.get('openai_api_key') or os.environ.get('OPENAI_API_KEY')
+    
+    if not api_key:
+        raise HTTPException(status_code=400, detail="OpenAI API key required")
+    
+    try:
+        client = AsyncOpenAI(api_key=api_key)
+        
+        if request.entityType == "territory":
+            territory = await db.territories.find_one({"id": request.entityId})
+            prompt = f"Analyze this territory in Ahmedabad: {territory['name']}. Metrics: {territory['metrics']}. Provide strategic insights."
+        elif request.entityType == "pin":
+            pin = await db.pins.find_one({"id": request.entityId})
+            prompt = f"Analyze this location pin in Ahmedabad: {pin['label']} ({pin['type']}). Provide business insights."
+        else:
+            raise HTTPException(status_code=400, detail="Invalid entity type")
+        
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300
+        )
+        
+        return {"analysis": response.choices[0].message.content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
 
 # ==================== SHARE LINK ROUTES ====================
 
 @api_router.post("/share-links")
-async def create_share_link(
-    territory_id: str,
-    current_user: Dict = Depends(get_current_user)
-):
-    share_link = ShareLink(
-        territoryId=territory_id,
-        createdBy=current_user['user_id']
-    )
-    
+async def create_share_link(territory_id: str, current_user: Dict = Depends(get_current_user)):
+    share_link = ShareLink(territoryId=territory_id, createdBy=current_user['user_id'])
     doc = share_link.model_dump()
     doc['createdAt'] = doc['createdAt'].isoformat()
     doc['expiresAt'] = doc['expiresAt'].isoformat()
-    
     await db.share_links.insert_one(doc)
-    
-    return {
-        "shareToken": share_link.token,
-        "shareUrl": f"/share/{share_link.token}",
-        "expiresAt": share_link.expiresAt
-    }
+    return {"shareToken": share_link.token, "shareUrl": f"/share/{share_link.token}", "expiresAt": share_link.expiresAt}
 
 @api_router.get("/share-links/validate/{token}")
 async def validate_share_link(token: str):
     link = await db.share_links.find_one({"token": token})
     if not link:
         raise HTTPException(status_code=404, detail="Invalid share link")
-    
     expires_at = datetime.fromisoformat(link['expiresAt'])
     if expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=410, detail="Share link expired")
-    
     territory = await db.territories.find_one({"id": link['territoryId']}, {"_id": 0})
     if isinstance(territory.get('updatedAt'), str):
         territory['updatedAt'] = datetime.fromisoformat(territory['updatedAt'])
-    
-    return {
-        "territory": Territory(**territory),
-        "token": token
-    }
+    return {"territory": Territory(**territory), "token": token}
 
 # ==================== COMMENT ROUTES ====================
 
 @api_router.post("/comments", response_model=Comment)
-async def create_comment(
-    comment_data: CommentCreate,
-    current_user: Dict = Depends(get_current_user)
-):
+async def create_comment(comment_data: CommentCreate, current_user: Dict = Depends(get_current_user)):
     if comment_data.useAI:
         api_key = comment_data.apiKey
         if not api_key:
             user = await db.users.find_one({"id": current_user['user_id']})
             api_key = user.get('openai_api_key')
-        
         if not api_key:
             raise HTTPException(status_code=400, detail="OpenAI API key required for AI validation")
-        
         validation = await validate_comment_ai(comment_data.text, api_key)
     else:
         validation = validate_comment_regex(comment_data.text)
@@ -843,59 +818,37 @@ async def create_comment(
         raise HTTPException(status_code=400, detail=f"Comment flagged: {validation['reason']}")
     
     user = await db.users.find_one({"id": current_user['user_id']})
-    
     comment = Comment(
-        territoryId=comment_data.territoryId,
-        userId=current_user['user_id'],
-        userName=user['name'],
-        text=comment_data.text,
-        validationStatus=validation['label'],
-        validationReason=validation['reason']
+        territoryId=comment_data.territoryId, userId=current_user['user_id'],
+        userName=user['name'], text=comment_data.text,
+        validationStatus=validation['label'], validationReason=validation['reason'],
+        sentiment=validation.get('sentiment', 'neutral')
     )
-    
     doc = comment.model_dump()
     doc['createdAt'] = doc['createdAt'].isoformat()
-    
     await db.comments.insert_one(doc)
     return comment
 
 @api_router.get("/comments/{territory_id}", response_model=List[Comment])
-async def get_comments(
-    territory_id: str,
-    current_user: Dict = Depends(get_current_user)
-):
-    comments = await db.comments.find(
-        {"territoryId": territory_id},
-        {"_id": 0}
-    ).sort("createdAt", -1).to_list(100)
-    
+async def get_comments(territory_id: str, current_user: Dict = Depends(get_current_user)):
+    comments = await db.comments.find({"territoryId": territory_id}, {"_id": 0}).sort("createdAt", -1).to_list(100)
     for comment in comments:
         if isinstance(comment.get('createdAt'), str):
             comment['createdAt'] = datetime.fromisoformat(comment['createdAt'])
-    
     return comments
 
 # ==================== DATA GATHERING ROUTES ====================
 
 @api_router.post("/data-gathering", response_model=DataGathering)
-async def submit_data(
-    form_data: DataGatheringForm,
-    current_user: Dict = Depends(get_current_user)
-):
+async def submit_data(form_data: DataGatheringForm, current_user: Dict = Depends(get_current_user)):
     data_entry = DataGathering(
-        territoryId=form_data.territoryId,
-        data=form_data.data,
-        submittedBy=current_user['user_id'],
-        shareToken=form_data.shareToken
+        territoryId=form_data.territoryId, data=form_data.data,
+        submittedBy=current_user['user_id'], shareToken=form_data.shareToken
     )
-    
     doc = data_entry.model_dump()
     doc['timestamp'] = doc['timestamp'].isoformat()
-    
     await db.data_gathering.insert_one(doc)
-    
     await manager.broadcast(json.dumps({"type": "data_submitted", "territoryId": form_data.territoryId}))
-    
     return data_entry
 
 @api_router.post("/data-gathering/public")
@@ -903,79 +856,39 @@ async def submit_data_public(form_data: dict):
     share_token = form_data.get('shareToken')
     if not share_token:
         raise HTTPException(status_code=400, detail="Share token required")
-    
     link = await db.share_links.find_one({"token": share_token})
     if not link:
         raise HTTPException(status_code=404, detail="Invalid share link")
-    
     expires_at = datetime.fromisoformat(link['expiresAt'])
     if expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=410, detail="Share link expired")
-    
     data_entry = DataGathering(
-        territoryId=link['territoryId'],
-        data=form_data.get('data', {}),
-        submittedBy="anonymous",
-        shareToken=share_token
+        territoryId=link['territoryId'], data=form_data.get('data', {}),
+        submittedBy="anonymous", shareToken=share_token
     )
-    
     doc = data_entry.model_dump()
     doc['timestamp'] = doc['timestamp'].isoformat()
-    
     await db.data_gathering.insert_one(doc)
-    
     await manager.broadcast(json.dumps({"type": "data_submitted", "territoryId": link['territoryId']}))
-    
     return {"message": "Data submitted successfully", "id": data_entry.id}
 
 @api_router.get("/data-gathering/{territory_id}", response_model=List[DataGathering])
-async def get_data_gathering(
-    territory_id: str,
-    current_user: Dict = Depends(get_current_user)
-):
-    data = await db.data_gathering.find(
-        {"territoryId": territory_id},
-        {"_id": 0}
-    ).to_list(1000)
-    
+async def get_data_gathering(territory_id: str, current_user: Dict = Depends(get_current_user)):
+    data = await db.data_gathering.find({"territoryId": territory_id}, {"_id": 0}).to_list(1000)
     for entry in data:
         if isinstance(entry.get('timestamp'), str):
             entry['timestamp'] = datetime.fromisoformat(entry['timestamp'])
-    
     return data
 
 # ==================== METRICS HISTORY ROUTES ====================
 
 @api_router.get("/metrics-history/{territory_id}", response_model=List[MetricsHistory])
-async def get_metrics_history(
-    territory_id: str,
-    current_user: Dict = Depends(get_current_user)
-):
-    history = await db.metrics_history.find(
-        {"territoryId": territory_id},
-        {"_id": 0}
-    ).sort("timestamp", 1).to_list(1000)
-    
+async def get_metrics_history(territory_id: str, current_user: Dict = Depends(get_current_user)):
+    history = await db.metrics_history.find({"territoryId": territory_id}, {"_id": 0}).sort("timestamp", 1).to_list(1000)
     for entry in history:
         if isinstance(entry.get('timestamp'), str):
             entry['timestamp'] = datetime.fromisoformat(entry['timestamp'])
-    
     return history
-
-# ==================== GEOCODING (REVERSE GEOCODE) ====================
-
-@api_router.get("/geocode/reverse")
-async def reverse_geocode(
-    lat: float = Query(...),
-    lng: float = Query(...),
-    current_user: Dict = Depends(get_current_user)
-):
-    """Simple reverse geocoding - returns approximate address"""
-    return {
-        "address": f"Location: {lat:.4f}, {lng:.4f}",
-        "lat": lat,
-        "lng": lng
-    }
 
 # ==================== WEBSOCKET ====================
 
@@ -993,11 +906,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @api_router.get("/")
 async def root():
-    return {"message": "R Territory AI Predictive Insights Engine API", "version": "2.5"}
+    return {"message": "R Territory AI Engine - Ahmedabad Edition", "version": "3.0", "city": "Ahmedabad"}
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "database": "connected"}
+    return {"status": "healthy", "database": "connected", "city": "Ahmedabad"}
 
 app.include_router(api_router)
 
@@ -1009,10 +922,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
