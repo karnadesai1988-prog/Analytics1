@@ -425,6 +425,9 @@ async def get_territory(territory_id: str, user: User = Depends(get_current_user
     territory = await db.territories.find_one({"id": territory_id})
     if not territory:
         raise HTTPException(status_code=404, detail="Territory not found")
+    # Check if territory has required fields (skip legacy data)
+    if 'pincode' not in territory or 'center' not in territory or 'boundary' not in territory:
+        raise HTTPException(status_code=404, detail="Territory data incompatible")
     return Territory(**territory)
 
 @api_router.put("/territories/{territory_id}")
