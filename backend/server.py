@@ -209,31 +209,36 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 def predict_appreciation(metrics: TerritoryMetrics) -> AIInsights:
     """
     Calculate price appreciation based on territory metrics
-    Formula: appreciation = 0.3*log(investments+1) + 0.25*livabilityIndex - 0.15*crimeRate + 0.2*govtInfra
+    Formula: appreciation = factors normalized to 0-25% range
     """
     try:
-        appreciation = (
-            0.3 * np.log(metrics.investments + 1) +
-            0.25 * (metrics.livabilityIndex / 10) +
-            0.2 * (metrics.govtInfra / 10) -
-            0.15 * (metrics.crimeRate / 10) +
-            0.1 * (metrics.qualityOfProject / 10) -
-            0.05 * (metrics.airPollutionIndex / 10)
-        ) * 100
+        # Normalize investment factor (log scale)
+        investment_factor = min(np.log10(metrics.investments + 1) / 2, 1.0)
         
-        # Calculate demand pressure
-        demand_pressure = (
-            0.4 * (metrics.populationDensity / 1000) +
-            0.3 * (metrics.buildings / 100) +
-            0.3 * (metrics.investments / 1000000)
-        ) * 100
+        # Calculate weighted appreciation (max ~25%)
+        appreciation = (
+            investment_factor * 5 +  # 0-5%
+            (metrics.livabilityIndex / 10) * 5 +  # 0-5%
+            (metrics.govtInfra / 10) * 4 +  # 0-4%
+            (metrics.qualityOfProject / 10) * 4 +  # 0-4%
+            (metrics.roads / 10) * 3 +  # 0-3%
+            (1 - metrics.crimeRate / 10) * 2 +  # 0-2% (lower crime = better)
+            (1 - metrics.airPollutionIndex / 10) * 2  # 0-2% (lower pollution = better)
+        )
+        
+        # Calculate demand pressure (0-100 scale)
+        demand_pressure = min((
+            (metrics.populationDensity / 1000) * 30 +
+            (metrics.buildings / 200) * 30 +
+            investment_factor * 40
+        ), 100)
         
         # Confidence score (higher is better)
-        confidence = min(0.85 + (metrics.qualityOfProject / 100), 0.95)
+        confidence = min(0.70 + (metrics.qualityOfProject / 50) + (metrics.govtInfra / 50), 0.95)
         
         return AIInsights(
-            appreciationPercent=round(max(0, appreciation), 2),
-            demandPressure=round(max(0, min(100, demand_pressure)), 2),
+            appreciationPercent=round(max(0, min(appreciation, 25)), 2),
+            demandPressure=round(max(0, demand_pressure), 2),
             confidenceScore=round(confidence, 2)
         )
     except Exception as e:
