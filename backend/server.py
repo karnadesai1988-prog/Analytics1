@@ -405,7 +405,9 @@ async def create_territory(territory: TerritoryCreate, user: User = Depends(chec
         "updatedAt": datetime.now(timezone.utc).isoformat()
     }
     await db.territories.insert_one(territory_doc)
-    await manager.broadcast(json.dumps({"type": "territory_created", "data": territory_doc}))
+    # Remove MongoDB ObjectId before broadcasting
+    broadcast_data = {k: v for k, v in territory_doc.items() if k != '_id'}
+    await manager.broadcast(json.dumps({"type": "territory_created", "data": broadcast_data}))
     return Territory(**territory_doc)
 
 @api_router.get("/territories", response_model=List[Territory])
