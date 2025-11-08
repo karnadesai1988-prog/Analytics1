@@ -215,75 +215,117 @@ backend:
 frontend:
   - task: "Settings page with API configuration"
     implemented: true
-    working: "NA"
+    working: true
     file: "frontend/src/pages/Settings.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Settings page rebuilt with OpenAI and Pincode API configuration fields"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Settings page fully functional. All API configuration fields present (OpenAI API Key, Pincode API URL, Pincode API Key). Successfully saves dummy configurations. Form validation and UI layout working correctly."
 
   - task: "TerritoriesUnified page with all features"
     implemented: true
-    working: "NA"
+    working: true
     file: "frontend/src/pages/TerritoriesUnified.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Complete rebuild with: Ahmedabad header, pincode-based territory creation, pin highlighting, filter dialog, only-selected toggle, responsive design"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: TerritoriesUnified page working excellently. Ahmedabad header prominent, map displays 15 territories and 14 pins, Create Territory/Add Pin/Filter buttons visible, NO search bar (correct), NO legend section (correct). Territory creation with pincode 380015 successful. Enhanced hover popups show AI insights, metrics, and suggestions. Pin creation dialog functional with location picker. Responsive design works on desktop/tablet/mobile."
 
   - task: "Sidebar navigation order"
     implemented: true
-    working: "NA"
+    working: true
     file: "frontend/src/components/Sidebar.js"
     stuck_count: 0
     priority: "low"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Territories & Map moved to first position in sidebar"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Sidebar navigation order correct. 'Territories & Map' is the first navigation option in sidebar, followed by Dashboard & Analytics, Data Gathering, Comments, and Settings."
 
   - task: "Pin type filtering"
     implemented: true
-    working: "NA"
+    working: true
     file: "frontend/src/pages/TerritoriesUnified.js"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Filter dialog with all 12 pin types, active filters displayed"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Pin type filtering working perfectly. Filter dialog shows all 12 pin types: Job, Supplier, Vendor, Shop, Office, Warehouse, Service Center, Event Venue, Project Site, Residential Area, Parking/Logistics, Landmark/Attraction. Active filters display count in button (e.g., 'Filter (3)'). Select All and Clear All buttons functional."
 
   - task: "Pin highlighting in selected territory"
     implemented: true
-    working: "NA"
+    working: true
     file: "frontend/src/pages/TerritoriesUnified.js"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Pins inside selected territory highlighted with larger red icon"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Pin highlighting working correctly. Territory selection highlights territory with orange border/background. Pins inside selected territory show enhanced highlighting and 'Inside selected territory' badge in popup."
 
   - task: "Only selected territory view toggle"
     implemented: true
-    working: "NA"
+    working: true
     file: "frontend/src/pages/TerritoriesUnified.js"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Toggle switch to show only selected territory and its pins"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Only selected territory view toggle working correctly. Toggle switch appears in sidebar when territory is selected. Enabling toggle shows only selected territory and its pins. Disabling toggle restores full view of all territories and pins."
+
+  - task: "RBAC for pin creation"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/TerritoriesUnified.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: RBAC working correctly. Admin users can create territories and pins successfully. Viewer users can access the interface and view all territories/pins but pin creation is properly blocked (dialog remains open indicating permission error). Viewer can view 15 territories and 14 pins but cannot create new ones."
+
+  - task: "Enhanced hover details"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/TerritoriesUnified.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Enhanced hover details working perfectly. Territory popups show: territory name/zone/pincode, AI Insights (appreciation %, confidence, demand), Key Metrics (investments, buildings, population, livability, crime rate, govt infra), AI Suggestions. Pin popups show: label, type badges, description, location coordinates, geofence indicator, created by info, 'Inside selected territory' badge when applicable."
 
 metadata:
   created_by: "main_agent"
