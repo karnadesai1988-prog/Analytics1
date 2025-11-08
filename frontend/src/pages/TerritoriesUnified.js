@@ -1,0 +1,749 @@
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Checkbox } from '../components/ui/checkbox';
+import { Switch } from '../components/ui/switch';
+import { Badge } from '../components/ui/badge';
+import { toast } from 'sonner';
+import { MapPin, Plus, Filter, Eye, Loader2 } from 'lucide-react';
+import axios from 'axios';
+import L from 'leaflet';
+import '../pages/MapManagement.css';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const AHMEDABAD_CENTER = [23.0225, 72.5714];
+
+const pinIcons = {
+  job: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  supplier: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  vendor: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  shop: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  office: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  warehouse: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  service_center: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  event_venue: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  project_site: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  residential_area: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  parking_logistics: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+  landmark: new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png', shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png', iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34] }),
+};
+
+const PIN_TYPES = [
+  { value: 'job', label: 'Job' },
+  { value: 'supplier', label: 'Supplier' },
+  { value: 'vendor', label: 'Vendor' },
+  { value: 'shop', label: 'Shop' },
+  { value: 'office', label: 'Office' },
+  { value: 'warehouse', label: 'Warehouse' },
+  { value: 'service_center', label: 'Service Center' },
+  { value: 'event_venue', label: 'Event Venue' },
+  { value: 'project_site', label: 'Project Site' },
+  { value: 'residential_area', label: 'Residential Area' },
+  { value: 'parking_logistics', label: 'Parking / Logistics' },
+  { value: 'landmark', label: 'Landmark / Attraction' },
+];
+
+const highlightedPinIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [35, 57],
+  iconAnchor: [17, 57],
+  popupAnchor: [1, -46],
+  className: 'highlighted-marker'
+});
+
+// Helper to check if a point is inside a polygon
+const isPointInPolygon = (point, polygon) => {
+  const [lat, lng] = point;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    const intersect = ((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+};
+
+const MapUpdater = ({ center, zoom }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, zoom || map.getZoom());
+    }
+  }, [center, zoom, map]);
+  return null;
+};
+
+const LocationPicker = ({ onLocationSelect }) => {
+  const [marker, setMarker] = useState(null);
+  const map = useMap();
+  
+  useEffect(() => {
+    const handleClick = (e) => {
+      const { lat, lng } = e.latlng;
+      setMarker({ lat, lng });
+      onLocationSelect({ lat, lng });
+    };
+    map.on('click', handleClick);
+    return () => map.off('click', handleClick);
+  }, [map, onLocationSelect]);
+
+  return marker ? (
+    <Marker position={[marker.lat, marker.lng]}>
+      <Popup>
+        <div className="text-sm">
+          <strong>Selected Location</strong><br/>
+          Lat: {marker.lat.toFixed(6)}<br/>
+          Lng: {marker.lng.toFixed(6)}
+        </div>
+      </Popup>
+    </Marker>
+  ) : null;
+};
+
+export const TerritoriesUnified = () => {
+  const [territories, setTerritories] = useState([]);
+  const [pins, setPins] = useState([]);
+  const [mapCenter, setMapCenter] = useState(AHMEDABAD_CENTER);
+  const [mapZoom, setMapZoom] = useState(12);
+  
+  const [showTerritoryDialog, setShowTerritoryDialog] = useState(false);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [showFilterDialog, setShowFilterDialog] = useState(false);
+  const [isPickingLocation, setIsPickingLocation] = useState(false);
+  
+  const [selectedTerritory, setSelectedTerritory] = useState(null);
+  const [viewOnlySelected, setViewOnlySelected] = useState(false);
+  const [activeFilters, setActiveFilters] = useState([]);
+  
+  const [territoryForm, setTerritoryForm] = useState({
+    name: '',
+    city: 'Ahmedabad',
+    zone: '',
+    pincode: ''
+  });
+  
+  const [pinForm, setPinForm] = useState({
+    location: { lat: AHMEDABAD_CENTER[0], lng: AHMEDABAD_CENTER[1] },
+    type: [],
+    label: '',
+    description: '',
+    hasGeofence: false,
+    geofenceRadius: 1000,
+    territoryId: '',
+    generateAIInsights: false
+  });
+
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const [territoriesRes, pinsRes] = await Promise.all([
+        axios.get(`${BACKEND_URL}/api/territories`, { headers }),
+        axios.get(`${BACKEND_URL}/api/pins`, { headers }),
+      ]);
+      setTerritories(territoriesRes.data);
+      setPins(pinsRes.data);
+    } catch (error) {
+      toast.error('Failed to load data');
+    }
+  };
+
+  const handleLocationPicked = (location) => {
+    setPinForm({ ...pinForm, location });
+  };
+
+  const handleCreateTerritory = async (e) => {
+    e.preventDefault();
+    
+    if (!territoryForm.pincode || territoryForm.pincode.length !== 6) {
+      toast.error('Please enter a valid 6-digit pincode');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Fetch boundary from user's configured API
+      const boundaryResponse = await axios.post(
+        `${BACKEND_URL}/api/pincode/boundary`,
+        { pincode: territoryForm.pincode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      const { boundary, center } = boundaryResponse.data;
+      
+      if (!boundary || boundary.length === 0) {
+        toast.error('No boundary data found for this pincode');
+        return;
+      }
+
+      // Create territory with fetched boundary
+      await axios.post(
+        `${BACKEND_URL}/api/territories`,
+        {
+          ...territoryForm,
+          center: center || {
+            lat: boundary.reduce((sum, p) => sum + p[0], 0) / boundary.length,
+            lng: boundary.reduce((sum, p) => sum + p[1], 0) / boundary.length
+          },
+          radius: 5000,
+          boundary: boundary,
+          metrics: {
+            investments: 0,
+            buildings: 0,
+            populationDensity: 0,
+            qualityOfProject: 0,
+            govtInfra: 0,
+            livabilityIndex: 0,
+            airPollutionIndex: 0,
+            roads: 0,
+            crimeRate: 0
+          },
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      toast.success(`Territory created for pincode ${territoryForm.pincode}!`);
+      setShowTerritoryDialog(false);
+      setTerritoryForm({ name: '', city: 'Ahmedabad', zone: '', pincode: '' });
+      loadData();
+    } catch (error) {
+      if (error.response?.status === 400) {
+        toast.error(error.response?.data?.detail || 'Pincode API not configured. Please configure in Settings.');
+      } else {
+        toast.error(error.response?.data?.detail || 'Failed to create territory');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreatePin = async (e) => {
+    e.preventDefault();
+    
+    if (pinForm.type.length === 0) {
+      toast.error('Select at least one pin type');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${BACKEND_URL}/api/pins`, pinForm, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Pin created successfully!');
+      setShowPinDialog(false);
+      setIsPickingLocation(false);
+      setPinForm({
+        location: { lat: AHMEDABAD_CENTER[0], lng: AHMEDABAD_CENTER[1] },
+        type: [],
+        label: '',
+        description: '',
+        hasGeofence: false,
+        geofenceRadius: 1000,
+        territoryId: '',
+        generateAIInsights: false
+      });
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to create pin');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTerritoryClick = (territory) => {
+    setSelectedTerritory(territory);
+    if (territory.center) {
+      setMapCenter([territory.center.lat, territory.center.lng]);
+      setMapZoom(13);
+    }
+  };
+
+  const toggleFilter = (filterValue) => {
+    setActiveFilters(prev => 
+      prev.includes(filterValue)
+        ? prev.filter(f => f !== filterValue)
+        : [...prev, filterValue]
+    );
+  };
+
+  const filteredPins = activeFilters.length > 0
+    ? pins.filter(pin => pin.type.some(t => activeFilters.includes(t)))
+    : pins;
+
+  const visibleTerritories = viewOnlySelected && selectedTerritory
+    ? [selectedTerritory]
+    : territories;
+
+  const visiblePins = viewOnlySelected && selectedTerritory
+    ? filteredPins.filter(pin => 
+        selectedTerritory.boundary && isPointInPolygon([pin.location.lat, pin.location.lng], selectedTerritory.boundary)
+      )
+    : filteredPins;
+
+  const isPinInSelectedTerritory = (pin) => {
+    if (!selectedTerritory || !selectedTerritory.boundary) return false;
+    return isPointInPolygon([pin.location.lat, pin.location.lng], selectedTerritory.boundary);
+  };
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className="bg-white border-b px-4 py-3 sm:px-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Ahmedabad</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Territories & Map Management</p>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={() => setShowTerritoryDialog(true)}
+              variant="default"
+              size="sm"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Create Territory
+            </Button>
+            
+            <Button
+              onClick={() => setShowPinDialog(true)}
+              variant="outline"
+              size="sm"
+            >
+              <MapPin className="w-4 h-4 mr-1" />
+              Add Pin
+            </Button>
+            
+            <Button
+              onClick={() => setShowFilterDialog(true)}
+              variant="outline"
+              size="sm"
+            >
+              <Filter className="w-4 h-4 mr-1" />
+              Filter ({activeFilters.length})
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-64 lg:w-80 bg-white border-r overflow-y-auto hidden md:block">
+          <div className="p-4 space-y-4">
+            {/* Toggle for selected territory view */}
+            {selectedTerritory && (
+              <Card className="p-3 bg-orange-50 border-orange-200">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Only Show Selected</Label>
+                  <Switch
+                    checked={viewOnlySelected}
+                    onCheckedChange={setViewOnlySelected}
+                  />
+                </div>
+                <p className="text-xs text-gray-600 mt-1">
+                  {viewOnlySelected ? 'Showing only selected territory' : 'Showing all territories'}
+                </p>
+              </Card>
+            )}
+
+            {/* Territories List */}
+            <div>
+              <h3 className="font-semibold mb-2 text-sm text-gray-700">Territories ({territories.length})</h3>
+              <div className="space-y-2">
+                {territories.map(territory => (
+                  <Card
+                    key={territory.id}
+                    className={`p-3 cursor-pointer transition-all hover:shadow-md ${
+                      selectedTerritory?.id === territory.id ? 'border-orange-500 border-2 bg-orange-50' : ''
+                    }`}
+                    onClick={() => handleTerritoryClick(territory)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm">{territory.name}</h4>
+                        <p className="text-xs text-gray-500 mt-1">Zone: {territory.zone}</p>
+                        <Badge variant="outline" className="mt-1 text-xs">
+                          {territory.pincode}
+                        </Badge>
+                      </div>
+                      {selectedTerritory?.id === territory.id && (
+                        <Eye className="w-4 h-4 text-orange-500" />
+                      )}
+                    </div>
+                    <div className="mt-2 pt-2 border-t text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Appreciation:</span>
+                        <span className="font-semibold text-green-600">
+                          {territory.aiInsights?.appreciationPercent || 0}%
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+                {territories.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">No territories yet</p>
+                )}
+              </div>
+            </div>
+
+            {/* Active Filters */}
+            {activeFilters.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2 text-sm text-gray-700">Active Filters</h3>
+                <div className="flex flex-wrap gap-1">
+                  {activeFilters.map(filter => (
+                    <Badge
+                      key={filter}
+                      variant="secondary"
+                      className="cursor-pointer"
+                      onClick={() => toggleFilter(filter)}
+                    >
+                      {PIN_TYPES.find(t => t.value === filter)?.label} ×
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Map */}
+        <div className="flex-1 relative">
+          <MapContainer
+            center={mapCenter}
+            zoom={mapZoom}
+            className="w-full h-full"
+            style={{ background: '#f0f0f0' }}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; OpenStreetMap contributors'
+            />
+            <MapUpdater center={mapCenter} zoom={mapZoom} />
+            
+            {isPickingLocation && <LocationPicker onLocationSelect={handleLocationPicked} />}
+            
+            {/* Territories */}
+            {visibleTerritories.map(territory => {
+              if (territory.boundary && territory.boundary.length > 0) {
+                return (
+                  <Polygon
+                    key={territory.id}
+                    positions={territory.boundary}
+                    pathOptions={{
+                      color: selectedTerritory?.id === territory.id ? '#f97316' : '#3b82f6',
+                      weight: selectedTerritory?.id === territory.id ? 3 : 2,
+                      fillOpacity: selectedTerritory?.id === territory.id ? 0.2 : 0.1
+                    }}
+                    eventHandlers={{
+                      click: () => handleTerritoryClick(territory)
+                    }}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <strong>{territory.name}</strong><br/>
+                        Zone: {territory.zone}<br/>
+                        Pincode: {territory.pincode}<br/>
+                        Appreciation: {territory.aiInsights?.appreciationPercent || 0}%
+                      </div>
+                    </Popup>
+                  </Polygon>
+                );
+              }
+              return null;
+            })}
+            
+            {/* Pins */}
+            {visiblePins.map(pin => {
+              const isHighlighted = isPinInSelectedTerritory(pin);
+              const icon = isHighlighted ? highlightedPinIcon : pinIcons[pin.type[0]] || pinIcons.job;
+              
+              return (
+                <React.Fragment key={pin.id}>
+                  <Marker
+                    position={[pin.location.lat, pin.location.lng]}
+                    icon={icon}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <strong>{pin.label}</strong><br/>
+                        Types: {pin.type.join(', ')}<br/>
+                        {pin.description && <><br/>{pin.description}</>}
+                        <br/>
+                        <span className="text-xs text-gray-500">By: {pin.userName}</span>
+                        {isHighlighted && (
+                          <div className="mt-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                            Inside selected territory
+                          </div>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                  {pin.hasGeofence && (
+                    <Circle
+                      center={[pin.location.lat, pin.location.lng]}
+                      radius={pin.geofenceRadius}
+                      pathOptions={{ color: 'purple', fillOpacity: 0.1 }}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </MapContainer>
+        </div>
+      </div>
+
+      {/* Create Territory Dialog */}
+      <Dialog open={showTerritoryDialog} onOpenChange={setShowTerritoryDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Territory</DialogTitle>
+            <DialogDescription>
+              Enter territory details. Boundary will be auto-generated from pincode.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTerritory} className="space-y-4">
+            <div>
+              <Label>Territory Name</Label>
+              <Input
+                required
+                value={territoryForm.name}
+                onChange={(e) => setTerritoryForm({ ...territoryForm, name: e.target.value })}
+                placeholder="e.g., Satellite Area"
+              />
+            </div>
+            
+            <div>
+              <Label>Zone</Label>
+              <Input
+                required
+                value={territoryForm.zone}
+                onChange={(e) => setTerritoryForm({ ...territoryForm, zone: e.target.value })}
+                placeholder="e.g., West Zone"
+              />
+            </div>
+            
+            <div>
+              <Label>Pincode (6 digits)</Label>
+              <Input
+                required
+                type="text"
+                maxLength={6}
+                pattern="[0-9]{6}"
+                value={territoryForm.pincode}
+                onChange={(e) => setTerritoryForm({ ...territoryForm, pincode: e.target.value })}
+                placeholder="380015"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Geofence boundary will be fetched automatically
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button type="submit" disabled={loading} className="flex-1">
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Territory'
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowTerritoryDialog(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Pin Dialog */}
+      <Dialog open={showPinDialog} onOpenChange={(open) => {
+        setShowPinDialog(open);
+        if (!open) setIsPickingLocation(false);
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Pin</DialogTitle>
+            <DialogDescription>
+              {isPickingLocation ? 'Click on the map to select location' : 'Configure pin details'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreatePin} className="space-y-4">
+            <div>
+              <Label>Location</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={`${pinForm.location.lat.toFixed(6)}, ${pinForm.location.lng.toFixed(6)}`}
+                  readOnly
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant={isPickingLocation ? 'default' : 'outline'}
+                  onClick={() => setIsPickingLocation(!isPickingLocation)}
+                >
+                  {isPickingLocation ? 'Picking...' : 'Pick'}
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <Label>Pin Types (select multiple)</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {PIN_TYPES.map(type => (
+                  <div key={type.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`pin-type-${type.value}`}
+                      checked={pinForm.type.includes(type.value)}
+                      onCheckedChange={(checked) => {
+                        setPinForm({
+                          ...pinForm,
+                          type: checked
+                            ? [...pinForm.type, type.value]
+                            : pinForm.type.filter(t => t !== type.value)
+                        });
+                      }}
+                    />
+                    <Label
+                      htmlFor={`pin-type-${type.value}`}
+                      className="text-sm cursor-pointer"
+                    >
+                      {type.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label>Label</Label>
+              <Input
+                required
+                value={pinForm.label}
+                onChange={(e) => setPinForm({ ...pinForm, label: e.target.value })}
+                placeholder="Pin name"
+              />
+            </div>
+
+            <div>
+              <Label>Description (Optional)</Label>
+              <Input
+                value={pinForm.description}
+                onChange={(e) => setPinForm({ ...pinForm, description: e.target.value })}
+                placeholder="Additional details"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hasGeofence"
+                checked={pinForm.hasGeofence}
+                onCheckedChange={(checked) => setPinForm({ ...pinForm, hasGeofence: checked })}
+              />
+              <Label htmlFor="hasGeofence">Enable Geofence</Label>
+            </div>
+
+            {pinForm.hasGeofence && (
+              <div>
+                <Label>Geofence Radius (meters)</Label>
+                <Input
+                  type="number"
+                  value={pinForm.geofenceRadius}
+                  onChange={(e) => setPinForm({ ...pinForm, geofenceRadius: parseInt(e.target.value) })}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <Button type="submit" disabled={loading} className="flex-1">
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Pin'
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowPinDialog(false);
+                  setIsPickingLocation(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Filter Dialog */}
+      <Dialog open={showFilterDialog} onOpenChange={setShowFilterDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filter Pins by Type</DialogTitle>
+            <DialogDescription>
+              Select pin types to show on the map
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {PIN_TYPES.map(type => (
+              <div key={type.value} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                <Label htmlFor={`filter-${type.value}`} className="cursor-pointer flex-1">
+                  {type.label}
+                </Label>
+                <Checkbox
+                  id={`filter-${type.value}`}
+                  checked={activeFilters.includes(type.value)}
+                  onCheckedChange={() => toggleFilter(type.value)}
+                />
+              </div>
+            ))}
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={() => setActiveFilters(PIN_TYPES.map(t => t.value))}
+                variant="outline"
+                className="flex-1"
+              >
+                Select All
+              </Button>
+              <Button
+                onClick={() => setActiveFilters([])}
+                variant="outline"
+                className="flex-1"
+              >
+                Clear All
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
