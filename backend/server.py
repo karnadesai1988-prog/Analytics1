@@ -365,8 +365,9 @@ async def create_territory(
     history_doc['timestamp'] = history_doc['timestamp'].isoformat()
     await db.metrics_history.insert_one(history_doc)
     
-    # Broadcast update
-    await manager.broadcast(json.dumps({"type": "territory_created", "data": doc}))
+    # Broadcast update (without _id)
+    broadcast_data = {k: v for k, v in doc.items() if k != '_id'}
+    await manager.broadcast(json.dumps({"type": "territory_created", "data": broadcast_data}))
     
     return territory
 
