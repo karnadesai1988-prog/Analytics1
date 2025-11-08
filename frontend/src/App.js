@@ -7,6 +7,7 @@ import { Auth } from './components/Auth';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { TerritoriesNew } from './pages/TerritoriesNew';
+import { MapManagement } from './pages/MapManagement';
 import { DataGathering } from './pages/DataGathering';
 import { Analytics } from './pages/Analytics';
 import { Comments } from './pages/Comments';
