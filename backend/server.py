@@ -394,8 +394,18 @@ async def config_api_key(config: APIKeyConfig, user: User = Depends(get_current_
 
 @api_router.post("/pincode/boundary")
 async def get_pincode_boundary(request: PincodeBoundaryRequest, user: User = Depends(get_current_user)):
+    # First check if we have fixed boundary data for Gujarat pincodes
+    if request.pincode in GUJARAT_PINCODE_BOUNDARIES:
+        data = GUJARAT_PINCODE_BOUNDARIES[request.pincode]
+        return {"boundary": data["boundary"], "center": data["center"], "source": "local_database"}
+    
+    # If not in local database, try external API
     if not user.pincode_api_url:
-        raise HTTPException(status_code=400, detail="Pincode API not configured. Please add API URL in Settings.")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Pincode {request.pincode} not found in local database. Please configure Pincode API in Settings for other pincodes."
+        )
+    
     try:
         async with httpx.AsyncClient() as client:
             headers = {}
@@ -410,7 +420,7 @@ async def get_pincode_boundary(request: PincodeBoundaryRequest, user: User = Dep
             response.raise_for_status()
             data = response.json()
             if 'boundary' in data:
-                return {"boundary": data['boundary'], "center": data.get('center')}
+                return {"boundary": data['boundary'], "center": data.get('center'), "source": "external_api"}
             else:
                 raise HTTPException(status_code=400, detail="Invalid response from Pincode API")
     except Exception as e:
