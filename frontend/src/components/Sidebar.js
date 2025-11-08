@@ -18,6 +18,7 @@ import {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Map Management', href: '/map-management', icon: MapPin },
   { name: 'Territories', href: '/territories', icon: MapPin },
   { name: 'Data Gathering', href: '/data-gathering', icon: FileText },
   { name: 'Analytics', href: '/analytics', icon: TrendingUp },
