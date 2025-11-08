@@ -12,7 +12,8 @@ import {
   TrendingUp,
   LogOut,
   Wifi,
-  WifiOff
+  WifiOff,
+  Settings
 } from 'lucide-react';
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Data Gathering', href: '/data-gathering', icon: FileText },
   { name: 'Analytics', href: '/analytics', icon: TrendingUp },
   { name: 'Comments', href: '/comments', icon: MessageSquare },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export const Sidebar = () => {
