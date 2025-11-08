@@ -5,7 +5,6 @@ import { Card, CardContent } from '../components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
 import { MapPin, Plus, Target, Search, Layers } from 'lucide-react';
@@ -45,7 +44,78 @@ const pinIcons = {
     iconAnchor: [12, 41],
     popupAnchor: [1, -34],
   }),
+  office: new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  }),
+  warehouse: new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  }),
+  service_center: new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  }),
+  event_venue: new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  }),
+  project_site: new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  }),
+  residential_area: new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  }),
+  parking_logistics: new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  }),
+  landmark: new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+  }),
 };
+
+const PIN_TYPES = [
+  { value: 'job', label: 'Job', color: 'blue' },
+  { value: 'supplier', label: 'Supplier', color: 'green' },
+  { value: 'vendor', label: 'Vendor', color: 'orange' },
+  { value: 'shop', label: 'Shop', color: 'red' },
+  { value: 'office', label: 'Office', color: 'violet' },
+  { value: 'warehouse', label: 'Warehouse', color: 'grey' },
+  { value: 'service_center', label: 'Service Center', color: 'yellow' },
+  { value: 'event_venue', label: 'Event Venue', color: 'red' },
+  { value: 'project_site', label: 'Project Site', color: 'orange' },
+  { value: 'residential_area', label: 'Residential Area', color: 'blue' },
+  { value: 'parking_logistics', label: 'Parking / Logistics Hub', color: 'grey' },
+  { value: 'landmark', label: 'Landmark / Attraction', color: 'gold' },
+];
 
 const LocationPicker = ({ onLocationSelect }) => {
   const [marker, setMarker] = useState(null);
@@ -216,7 +286,7 @@ export const MapManagement = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Ahmedabad Territory Map</h1>
-            <p className="text-gray-600 mt-1">Place picker • 5km Geofencing • Pin Geofencing • AI Insights</p>
+            <p className="text-gray-600 mt-1">Place picker • 5km Geofencing • 12 Pin Types • AI Insights</p>
           </div>
           
           <div className="flex gap-2">
@@ -315,21 +385,29 @@ export const MapManagement = () => {
               <React.Fragment key={pin.id}>
                 <Marker
                   position={[pin.location.lat, pin.location.lng]}
-                  icon={pinIcons[primaryType]}
+                  icon={pinIcons[primaryType] || pinIcons.job}
                 >
                   <Popup>
-                    <div className="p-3">
+                    <div className="p-3 max-w-[300px]">
                       <h4 className="font-bold mb-1">{pin.label}</h4>
                       <div className="flex flex-wrap gap-1 mb-2">
-                        {pin.type.map(t => (
-                          <span key={t} className="text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded">
-                            {t}
-                          </span>
-                        ))}
+                        {pin.type.map(t => {
+                          const typeInfo = PIN_TYPES.find(pt => pt.value === t);
+                          return (
+                            <span key={t} className="text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded">
+                              {typeInfo?.label || t}
+                            </span>
+                          );
+                        })}
                       </div>
                       {pin.description && <p className="text-sm text-gray-600 mb-2">{pin.description}</p>}
                       {pin.hasGeofence && (
-                        <p className="text-xs text-blue-600">Geofence: {pin.geofenceRadius}m</p>
+                        <p className="text-xs text-blue-600 font-semibold">🔵 Geofence: {pin.geofenceRadius}m</p>
+                      )}
+                      {pin.aiInsights && (
+                        <div className="mt-2 pt-2 border-t">
+                          <p className="text-xs font-semibold text-purple-600">🤖 AI Insights Available</p>
+                        </div>
                       )}
                     </div>
                   </Popup>
@@ -355,9 +433,9 @@ export const MapManagement = () => {
           <CardContent className="p-4">
             <h4 className="font-semibold mb-3 flex items-center gap-2">
               <Layers className="w-4 h-4" />
-              Map Legend
+              12 Pin Types
             </h4>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-xs max-h-[300px] overflow-y-auto">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-full border-2 border-orange-500"></div>
                 <span>Territory (5km)</span>
@@ -366,14 +444,12 @@ export const MapManagement = () => {
                 <div className="w-4 h-4 rounded-full border-2 border-blue-500"></div>
                 <span>Pin Geofence</span>
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-blue-600" />
-                <span>Job</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-green-600" />
-                <span>Supplier</span>
-              </div>
+              {PIN_TYPES.map(type => (
+                <div key={type.value} className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full bg-${type.color}-600`}></div>
+                  <span>{type.label}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -465,11 +541,11 @@ export const MapManagement = () => {
       </Dialog>
 
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
-        <DialogContent className="glass-dialog max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-dialog max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Pin with Geofence Option</DialogTitle>
+            <DialogTitle>Create Pin with 12 Types & Geofence</DialogTitle>
             <DialogDescription>
-              Click map to select location in Ahmedabad
+              Click map to select location in Ahmedabad • Multi-select pin types
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreatePin} className="space-y-4">
@@ -484,18 +560,19 @@ export const MapManagement = () => {
             </div>
             
             <div>
-              <Label>Pin Types (Select multiple) *</Label>
-              <div className="grid grid-cols-2 gap-3 mt-2">
-                {['job', 'supplier', 'vendor', 'shop'].map(type => (
-                  <div key={type} className="flex items-center gap-2">
+              <Label className="mb-3 block">Pin Types (Select multiple) *</Label>
+              <div className="grid grid-cols-3 gap-3 max-h-[200px] overflow-y-auto p-2 border rounded">
+                {PIN_TYPES.map(type => (
+                  <div key={type.value} className="flex items-center gap-2">
                     <Checkbox
-                      checked={pinForm.type.includes(type)}
-                      onCheckedChange={() => handlePinTypeToggle(type)}
+                      checked={pinForm.type.includes(type.value)}
+                      onCheckedChange={() => handlePinTypeToggle(type.value)}
                     />
-                    <label className="capitalize cursor-pointer">{type}</label>
+                    <label className="text-sm cursor-pointer">{type.label}</label>
                   </div>
                 ))}
               </div>
+              <p className="text-xs text-gray-500 mt-2">{pinForm.type.length} type(s) selected</p>
             </div>
             
             <div>
@@ -539,7 +616,7 @@ export const MapManagement = () => {
             
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-3">
-                <Label>Enable Geofence for This Pin</Label>
+                <Label>🔵 Enable Geofence for This Pin</Label>
                 <Checkbox
                   checked={pinForm.hasGeofence}
                   onCheckedChange={(checked) => setPinForm({ ...pinForm, hasGeofence: checked })}
@@ -555,20 +632,20 @@ export const MapManagement = () => {
                     onChange={(e) => setPinForm({ ...pinForm, geofenceRadius: parseInt(e.target.value) || 1000 })}
                     placeholder="1000"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Default: 1000m (1km)</p>
+                  <p className="text-xs text-gray-500 mt-1">Default: 1000m (1km) • Creates blue circular geofence</p>
                 </div>
               )}
             </div>
 
             <div className="border-t pt-4">
               <div className="flex items-center justify-between">
-                <Label>Generate AI Insights</Label>
+                <Label>🤖 Generate AI Insights</Label>
                 <Checkbox
                   checked={pinForm.generateAIInsights}
                   onCheckedChange={(checked) => setPinForm({ ...pinForm, generateAIInsights: checked })}
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Get strategic recommendations & risk analysis</p>
+              <p className="text-xs text-gray-500 mt-1">Get strategic recommendations & risk analysis (requires API key)</p>
             </div>
             
             <div className="flex gap-2">
