@@ -419,6 +419,19 @@ async def get_territories(current_user: Dict = Depends(get_current_user)):
     for territory in territories:
         if isinstance(territory.get('updatedAt'), str):
             territory['updatedAt'] = datetime.fromisoformat(territory['updatedAt'])
+        
+        # Backward compatibility: convert old polygon format to new circle format
+        if 'coordinates' in territory and 'center' not in territory:
+            coords = territory.get('coordinates', {}).get('coordinates', [[]])[0]
+            if coords and len(coords) > 0:
+                # Calculate center from polygon
+                lats = [c[1] for c in coords]
+                lngs = [c[0] for c in coords]
+                territory['center'] = {
+                    'lat': sum(lats) / len(lats),
+                    'lng': sum(lngs) / len(lngs)
+                }
+                territory['radius'] = 3000
     
     return territories
 
