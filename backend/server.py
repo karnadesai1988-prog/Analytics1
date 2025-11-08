@@ -550,7 +550,9 @@ async def create_comment(comment: CommentCreate, user: User = Depends(get_curren
         "createdAt": datetime.now(timezone.utc).isoformat()
     }
     await db.comments.insert_one(comment_doc)
-    await manager.broadcast(json.dumps({"type": "comment_created", "data": comment_doc}))
+    # Remove MongoDB ObjectId before broadcasting
+    broadcast_data = {k: v for k, v in comment_doc.items() if k != '_id'}
+    await manager.broadcast(json.dumps({"type": "comment_created", "data": broadcast_data}))
     return Comment(**comment_doc)
 
 @api_router.get("/comments", response_model=List[Comment])
