@@ -411,7 +411,14 @@ async def create_territory(territory: TerritoryCreate, user: User = Depends(chec
 @api_router.get("/territories", response_model=List[Territory])
 async def get_territories(user: User = Depends(get_current_user)):
     territories = await db.territories.find().to_list(length=None)
-    return [Territory(**t) for t in territories]
+    # Handle legacy territories that don't have required fields
+    result = []
+    for t in territories:
+        # Skip territories missing required fields (legacy data)
+        if 'pincode' not in t or 'center' not in t or 'boundary' not in t:
+            continue
+        result.append(Territory(**t))
+    return result
 
 @api_router.get("/territories/{territory_id}", response_model=Territory)
 async def get_territory(territory_id: str, user: User = Depends(get_current_user)):
