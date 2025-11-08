@@ -1,32 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { Key, Save } from 'lucide-react';
+import { Key, Save, Map, Globe } from 'lucide-react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 export const Settings = () => {
-  const [apiKey, setApiKey] = useState('');
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [pincodeApiUrl, setPincodeApiUrl] = useState('');
+  const [pincodeApiKey, setPincodeApiKey] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSaveApiKey = async (e) => {
+  const handleSaveConfig = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       await axios.post(
         `${BACKEND_URL}/api/auth/config-api-key`,
-        { openai_api_key: apiKey },
+        {
+          openai_api_key: openaiKey || undefined,
+          pincode_api_url: pincodeApiUrl || undefined,
+          pincode_api_key: pincodeApiKey || undefined,
+        },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
-      toast.success('OpenAI API key configured successfully!');
-      setApiKey('');
+      toast.success('API configuration saved successfully!');
+      setOpenaiKey('');
+      setPincodeApiUrl('');
+      setPincodeApiKey('');
     } catch (error) {
-      toast.error('Failed to save API key');
+      toast.error('Failed to save configuration');
     } finally {
       setLoading(false);
     }
@@ -39,7 +47,7 @@ export const Settings = () => {
         <p className="text-muted-foreground mt-1">Configure your API keys and preferences</p>
       </div>
 
-      <div className="max-w-2xl">
+      <div className="max-w-2xl space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -47,22 +55,22 @@ export const Settings = () => {
               OpenAI API Configuration
             </CardTitle>
             <CardDescription>
-              Configure your OpenAI API key for AI-powered comment validation
+              Configure your OpenAI API key for AI-powered features
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSaveApiKey} className="space-y-4">
+            <form onSubmit={handleSaveConfig} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="apiKey">OpenAI API Key</Label>
+                <Label htmlFor="openaiKey">OpenAI API Key (Optional)</Label>
                 <Input
-                  id="apiKey"
+                  id="openaiKey"
                   type="password"
                   placeholder="sk-..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKey(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Your API key is encrypted and stored securely. Get your key from{' '}
+                  Get your key from{' '}
                   <a
                     href="https://platform.openai.com/api-keys"
                     target="_blank"
@@ -74,34 +82,80 @@ export const Settings = () => {
                 </p>
               </div>
 
-              <Button type="submit" disabled={loading}>
+              <div className="border-t pt-4 mt-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Map className="w-4 h-4" />
+                  Pincode Geofencing API
+                </h3>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="pincodeApiUrl">Pincode API Endpoint URL (Required)</Label>
+                    <Input
+                      id="pincodeApiUrl"
+                      type="url"
+                      placeholder="https://api.example.com/pincode"
+                      value={pincodeApiUrl}
+                      onChange={(e) => setPincodeApiUrl(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      This API should accept a 'pincode' parameter and return boundary coordinates
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="pincodeApiKey">Pincode API Key (Optional)</Label>
+                    <Input
+                      id="pincodeApiKey"
+                      type="password"
+                      placeholder="Your API key if required"
+                      value={pincodeApiKey}
+                      onChange={(e) => setPincodeApiKey(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Leave empty if your pincode API doesn't require authentication
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button type="submit" disabled={loading} className="w-full">
                 <Save className="w-4 h-4 mr-2" />
-                {loading ? 'Saving...' : 'Save API Key'}
+                {loading ? 'Saving...' : 'Save Configuration'}
               </Button>
             </form>
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h4 className="font-semibold mb-2 text-sm">How it works:</h4>
-              <ul className="text-sm space-y-1 list-disc list-inside text-muted-foreground">
-                <li>API key is optional - basic regex validation works without it</li>
-                <li>Enable "AI Validation" toggle when posting comments</li>
-                <li>Uses GPT-4o-mini for cost-effective content moderation</li>
-                <li>More accurate spam and abuse detection</li>
-              </ul>
+              <h4 className="font-semibold mb-2 text-sm">Expected Pincode API Response Format:</h4>
+              <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">
+{`{
+  "boundary": [
+    [lat1, lng1],
+    [lat2, lng2],
+    ...
+  ],
+  "center": {
+    "lat": centerLat,
+    "lng": centerLng
+  }
+}`}
+              </pre>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="mt-6">
+        <Card>
           <CardHeader>
-            <CardTitle>Deployment Information</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5" />
+              Deployment Information
+            </CardTitle>
             <CardDescription>This instance is fully independent</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Backend:</span>
-                <span className="font-mono">{BACKEND_URL}</span>
+                <span className="font-mono text-xs">{BACKEND_URL}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Database:</span>
@@ -109,7 +163,7 @@ export const Settings = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Dependencies:</span>
-                <span className="text-green-600">None (Emergent-free)</span>
+                <span className="text-green-600 font-semibold">None (Platform-Independent)</span>
               </div>
             </div>
             <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
